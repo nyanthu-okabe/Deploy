@@ -154,15 +154,24 @@
         </div>
 
         <script>
-            const initialCode = `{% if load_content %}{{ load_content|safe }}{% else %}<?php
-         echo 'Hello';
-        ?>{% endif %}`;
+            // HTMLエンティティをデコードする関数
+            function decodeHTMLEntities(text) {
+                const textarea = document.createElement("textarea");
+                textarea.innerHTML = text;
+                return textarea.value;
+            }
 
+            // Jinjaから来た内容（エスケープされたまま渡ってくる）
+            const rawCode = `{{ load_content|e if load_content else "" }}`;
+            const initialCode = decodeHTMLEntities(rawCode);
+
+            // Monaco Editor 読み込み設定
             require.config({
                 paths: {
                     vs: "https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs",
                 },
             });
+
             require(["vs/editor/editor.main"], function () {
                 window.editor = monaco.editor.create(
                     document.getElementById("editor"),
@@ -175,6 +184,7 @@
                 );
             });
 
+            // フォーム送信時にエディタの内容を hidden input にセット
             document
                 .querySelector("form")
                 .addEventListener("submit", function () {

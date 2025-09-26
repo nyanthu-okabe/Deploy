@@ -45,12 +45,6 @@
     </head>
     <body>
         <form method="post">
-            <p><strong>NyanthuOfficialDeploy</strong></p>
-            <details>
-                <summary>詳細</summary>
-                <p>nyanthu official deployにようこそ</p>
-                <p>心当たりがない方はタブを閉じてください</p>
-            </details>
             {% with messages = get_flashed_messages() %} {% if messages %}
             <div class="flash">{{ messages[0] }}</div>
             {% endif %} {% endwith %}

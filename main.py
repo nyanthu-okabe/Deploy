@@ -1,57 +1,66 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, session
+from flask import Flask, request, render_template, redirect, url_for, flash
 import os
+import subprocess
 
 app = Flask(__name__)
-app.secret_key = "nyanchu_secret"  # セッション用の鍵
+app.secret_key = "secret"  # flash用
+UPLOAD_FOLDER = "uploads"
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
-# --- 認証設定 ---
-USERNAME = "nyanchu"
-PASSWORD = "1234"
 
-@app.before_request
-def check_login():
-    if request.endpoint not in ("login", "static") and not session.get("logged_in"):
-        return redirect(url_for("login"))
-
-@app.route("/login", methods=["GET", "POST"])
-def login():
-    if request.method == "POST":
-        if request.form.get("username") == USERNAME and request.form.get("password") == PASSWORD:
-            session["logged_in"] = True
-            return redirect(url_for("index"))
-        else:
-            flash("ユーザ名かパスワードが違います")
-    return render_template("login.html")
-
-@app.route("/logout")
-def logout():
-    session.pop("logged_in", None)
-    return redirect(url_for("login"))
-
-# --- PHPエディタ部分 ---
 @app.route("/", methods=["GET", "POST"])
 def index():
-    load_filename = request.args.get("filename")
-    load_content = ""
-    files = [f for f in os.listdir("./files") if f.endswith(".php")]
-
+    files = os.listdir(UPLOAD_FOLDER)
     if request.method == "POST":
-        filename = request.form["filename"]
-        content = request.form["user_input"]
-        with open(f"./files/{filename}", "w", encoding="utf-8") as f:
-            f.write(content)
-        flash(f"{filename} を保存しました")
+        filename = request.form.get("filename", "user.php")
+        code = request.form.get("user_input", "")
+        filepath = os.path.join(UPLOAD_FOLDER, filename)
+
+        # 保存
+        with open(filepath, "w", encoding="utf-8") as f:
+            f.write(code)
+
+        flash(f"{filename} を保存したで！")
         return redirect(url_for("index"))
 
-    if load_filename:
-        try:
-            with open(f"./files/{load_filename}", "r", encoding="utf-8") as f:
-                load_content = f.read()
-        except FileNotFoundError:
-            flash("ファイルが見つかりません")
+    return render_template("index.html", files=files)
 
-    return render_template("index.html", files=files, load_filename=load_filename, load_content=load_content)
+
+@app.route("/run/<filename>")
+def run_php(filename):
+    filepath = os.path.join(UPLOAD_FOLDER, filename)
+    if not os.path.exists(filepath):
+        return "ファイルないで", 404
+    try:
+        output = subprocess.check_output(["php", filepath], stderr=subprocess.STDOUT)
+        return f"<pre>{output.decode('utf-8')}</pre>"
+    except subprocess.CalledProcessError as e:
+        return f"<pre>エラー:\n{e.output.decode('utf-8')}</pre>"
+
+
+@app.route("/delete/<filename>")
+def delete_file(filename):
+    filepath = os.path.join(UPLOAD_FOLDER, filename)
+    if os.path.exists(filepath):
+        os.remove(filepath)
+        flash(f"{filename} を消したで！")
+    return redirect(url_for("index"))
+
+
+@app.route("/load/<filename>")
+def load_file(filename):
+    filepath = os.path.join(UPLOAD_FOLDER, filename)
+    if not os.path.exists(filepath):
+        return "ファイルないで", 404
+    with open(filepath, "r", encoding="utf-8") as f:
+        content = f.read()
+    return render_template(
+        "index.html",
+        files=os.listdir(UPLOAD_FOLDER),
+        load_filename=filename,
+        load_content=content,
+    )
+
 
 if __name__ == "__main__":
-    os.makedirs("./files", exist_ok=True)
-    app.run(host="0.0.0.0", port=8000, debug=True)
+    app.run(debug=True)
